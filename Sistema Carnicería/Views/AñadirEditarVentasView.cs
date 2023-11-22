@@ -22,6 +22,7 @@ namespace Sistema_Carnicería.Presentation
         CarniceríaContext db = new CarniceríaContext();
         Venta venta;
         public int idVentaSeleccionada = 0;
+        public List<Producto> productosArray = new List<Producto>();
         public AñadirEditarVentasView()
         {
             InitializeComponent();
@@ -42,7 +43,8 @@ namespace Sistema_Carnicería.Presentation
         }
         private void CargarCboProductos()
         {
-            cboProductos.DataSource = db.Productos.ToList();
+            productosArray = db.Productos.ToList();
+            cboProductos.DataSource = productosArray;
             cboProductos.DisplayMember = "Nombre";
             cboProductos.ValueMember = "Id";
         }
@@ -144,6 +146,7 @@ namespace Sistema_Carnicería.Presentation
             venta.ProductoId = Convert.ToInt32(cboProductos.SelectedValue);
             venta.Cantidad = (int)NUDcantidad.Value;
             venta.Fecha = DateTime.Now;
+            venta.MontoTotal = productosArray.FirstOrDefault(p => p.Id == venta.ProductoId).Monto;
             if (venta.Id == 0)
             {
                 db.Ventas.Add(venta);

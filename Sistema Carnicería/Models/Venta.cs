@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Microsoft.EntityFrameworkCore;
+using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
@@ -26,5 +27,7 @@ namespace Sistema_Carnicería.Models
         public string NombreProducto { get; set; }
         public int Cantidad { get; set; }
         public DateTime Fecha { get; set; }
+        [Precision(12, 2)]
+        public decimal MontoTotal { get; set; }
     }
 }
