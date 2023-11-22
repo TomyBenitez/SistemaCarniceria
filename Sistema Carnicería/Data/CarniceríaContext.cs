@@ -113,6 +113,7 @@ namespace Sistema_Carnicería.Data
                     ProductoId = 1,
                     Cantidad = 1,
                     Fecha = DateTime.Now,
+                    MontoTotal = 2500
                 }
                 );
             #endregion
