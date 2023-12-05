@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.Reporting.WinForms;
 using Sistema_Carnicería.Data;
+using Sistema_Carnicería.Repositories;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -15,7 +16,7 @@ namespace Sistema_Carnicería.ViewReports
 {
     public partial class ReporteClientesView : Form
     {
-        CarniceríaContext db = new CarniceríaContext();
+        private ClientesRepository repository = new ClientesRepository();
         ReportViewer reporte = new ReportViewer();
         public ReporteClientesView()
         {
@@ -30,7 +31,7 @@ namespace Sistema_Carnicería.ViewReports
         private async void ReporteClientesView_Load(object sender, EventArgs e)
         {
             reporte.LocalReport.ReportEmbeddedResource = "Sistema_Carnicería.Reports.RptListadoClientes.rdlc";
-            var clientes = await db.Clientes.ToListAsync();
+            var clientes = await repository.GetAllAsync();
             reporte.LocalReport.DataSources.Add(new ReportDataSource("DSClientes", clientes));
             reporte.RefreshReport();
         }

@@ -1,6 +1,8 @@
-﻿using Microsoft.Reporting.WinForms;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Reporting.WinForms;
 using Sistema_Carnicería.Data;
 using Sistema_Carnicería.Models;
+using Sistema_Carnicería.Repositories;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -18,11 +20,11 @@ namespace Sistema_Carnicería.Views
     {
         bool ConexionRealizada = false;
         bool ImpresionRealizada = false;
-        CarniceríaContext db = new CarniceríaContext();
+        private CobradoresRepository repository = new CobradoresRepository();
+        private CarniceríaContext db = new CarniceríaContext();
         public SplashView()
         {
             InitializeComponent();
-            var db = new CarniceríaContext();
             db.Database.EnsureCreated();
         }
 

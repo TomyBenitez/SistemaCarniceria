@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Sistema_Carnicería.Data;
 using Sistema_Carnicería.Enums;
 using Sistema_Carnicería.Models;
+using Sistema_Carnicería.Repositories;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -18,9 +19,8 @@ namespace Sistema_Carnicería.Presentation
 {
     public partial class AñadirEditarCobradoresView : Form
     {
-        CarniceríaContext db = new CarniceríaContext();
-        Cobrador cobrador;
-        public int idCobradorSeleccionado = 0;
+        private CobradoresRepository cobradoresRepository = new CobradoresRepository();
+        Cobrador CobradorEditado { get; set; }
         public AñadirEditarCobradoresView()
         {
             InitializeComponent();
@@ -35,7 +35,9 @@ namespace Sistema_Carnicería.Presentation
 
         private async void ActualizarGrilla()
         {
-            grdCobradores.DataSource = await db.Cobradores.ToListAsync();
+            grdCobradores.DataSource = null;
+            var todosLosCobradores = await cobradoresRepository.GetAllAsync();
+            grdCobradores.DataSource = todosLosCobradores.ToList();
             if (HomeCarniceríaView.UsuarioLogueado.Tipocobrador == TipoCobradorEnum.Encargado)
             {
                 PermisosUsuarioEncargado(true);
@@ -73,7 +75,19 @@ namespace Sistema_Carnicería.Presentation
         }
         private async void ActualizarGrilla(string cadenaDeBusqueda)
         {
-            grdCobradores.DataSource = await db.Cobradores.Where(c => c.Apellido_Nombre.Contains(cadenaDeBusqueda)).ToListAsync();
+            var todosLosCobradores = await cobradoresRepository.GetAllAsync();
+            var cobradoresFiltrados = todosLosCobradores
+                .Where(c => c.Apellido_Nombre.Contains(cadenaDeBusqueda))
+                .ToList();
+            grdCobradores.DataSource = cobradoresFiltrados;
+            if (HomeCarniceríaView.UsuarioLogueado.Tipocobrador == TipoCobradorEnum.Encargado)
+            {
+                PermisosUsuarioEncargado(true);
+            }
+            else if (HomeCarniceríaView.UsuarioLogueado.Tipocobrador == TipoCobradorEnum.Empleado)
+            {
+                PermisosUsuarioEmpleado(true);
+            }
         }
         private void HabilitarBotones(bool valor)
         {
@@ -116,13 +130,13 @@ namespace Sistema_Carnicería.Presentation
         }
         private void CargarDatosActividad()
         {
-            txtApellido_Nombre.Text = cobrador.Apellido_Nombre;
-            txtDireccion.Text = cobrador.Dirección;
-            txtTelefono.Text = cobrador.Teléfono;
-            txtPassword.Text = cobrador.Password;
-            txtUser.Text = cobrador.Username;
-            cboPermisos.SelectedIndex = (int)cobrador.Tipocobrador;
-            txtCodigo.Text = cobrador.Id.ToString();
+            txtApellido_Nombre.Text = CobradorEditado.Apellido_Nombre;
+            txtDireccion.Text = CobradorEditado.Dirección;
+            txtTelefono.Text = CobradorEditado.Teléfono;
+            txtPassword.Text = CobradorEditado.Password;
+            txtUser.Text = CobradorEditado.Username;
+            cboPermisos.SelectedIndex = (int)CobradorEditado.Tipocobrador;
+            txtCodigo.Text = CobradorEditado.Id.ToString();
         }
 
         private void btnSalir_Click(object sender, EventArgs e)
@@ -134,19 +148,22 @@ namespace Sistema_Carnicería.Presentation
         {
             tabPestañaGeneral.SelectedIndex = 1;
             HabilitarBotones(true);
-            cobrador = new Cobrador();
+            CobradorEditado = new Cobrador();
             CargarDatosActividad();
         }
 
-        private void btnModificar_Click(object sender, EventArgs e)
+        private async Task RecuperarDatosCobradoresSeleccionado()
+        {
+            int idNotaSeleccionada = (int)grdCobradores.CurrentRow.Cells[0].Value;
+            CobradorEditado = await cobradoresRepository.GetById(idNotaSeleccionada);
+        }
+
+        private async void btnModificar_Click(object sender, EventArgs e)
         {
             tabPestañaGeneral.SelectedIndex = 1;
             HabilitarBotones(true);
-            if (idCobradorSeleccionado != 0)
-            {
-                cobrador = db.Cobradores.Find(idCobradorSeleccionado);
-                CargarDatosActividad();
-            }
+            await RecuperarDatosCobradoresSeleccionado();
+            CargarDatosActividad();
         }
 
         private void btnCancelar_Click(object sender, EventArgs e)
@@ -155,38 +172,36 @@ namespace Sistema_Carnicería.Presentation
             HabilitarBotones(false);
         }
 
-        private void btnGuardar_Click(object sender, EventArgs e)
+        private async void btnGuardar_Click(object sender, EventArgs e)
         {
-            cobrador.Apellido_Nombre = txtApellido_Nombre.Text;
-            cobrador.Dirección = txtDireccion.Text;
-            cobrador.Teléfono = txtTelefono.Text;
-            cobrador.Username = txtUser.Text;
-            cobrador.Password = Helper.ObtenerHashSha256(txtPassword.Text);
-            cobrador.Tipocobrador = (TipoCobradorEnum)cboPermisos.SelectedValue;
-            if (cobrador.Id == 0)
+            CobradorEditado.Apellido_Nombre = txtApellido_Nombre.Text;
+            CobradorEditado.Dirección = txtDireccion.Text;
+            CobradorEditado.Teléfono = txtTelefono.Text;
+            CobradorEditado.Username = txtUser.Text;
+            CobradorEditado.Password = Helper.ObtenerHashSha256(txtPassword.Text);
+            CobradorEditado.Tipocobrador = (TipoCobradorEnum)cboPermisos.SelectedValue;
+            if (CobradorEditado.Id == 0)
             {
-                db.Cobradores.Add(cobrador);
+                await cobradoresRepository.AddAsync(CobradorEditado);
             }
             else
             {
-                db.Entry(cobrador).State = EntityState.Modified;
+                await cobradoresRepository.UpdateAsync(CobradorEditado);
             }
-            db.SaveChanges();
+            CobradorEditado = null;
             tabPestañaGeneral.SelectedIndex = 0;
             ActualizarGrilla();
             HabilitarBotones(false);
         }
 
-        private void btnEliminar_Click(object sender, EventArgs e)
+        private async void btnEliminar_Click(object sender, EventArgs e)
         {
             var idCobrador = (int)grdCobradores.CurrentRow.Cells[0].Value;
             var nombreCobrador = (string)grdCobradores.CurrentRow.Cells[1].Value;
             DialogResult respuesta = MessageBox.Show($"¿Deseas eliminar a {nombreCobrador}?", "Eliminar", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (respuesta == DialogResult.Yes)
             {
-                var CobradorBorrar = db.Cobradores.Find(idCobrador);
-                db.Cobradores.Remove(CobradorBorrar);
-                db.SaveChanges();
+                await cobradoresRepository.RemoveAsync(idCobrador);
                 ActualizarGrilla();
             }
         }
@@ -198,8 +213,14 @@ namespace Sistema_Carnicería.Presentation
 
         private void grdCobradores_CellEnter(object sender, DataGridViewCellEventArgs e)
         {
-            idCobradorSeleccionado = (int)grdCobradores.CurrentRow.Cells[0].Value;
-            cobrador = db.Cobradores.Find(idCobradorSeleccionado);
+            if (grdCobradores.CurrentRow != null)
+            {
+                var clienteSeleccionado = grdCobradores.CurrentRow.DataBoundItem as Cobrador;
+                if (clienteSeleccionado != null)
+                {
+                    CobradorEditado = clienteSeleccionado;
+                }
+            }
             CargarDatosActividad();
         }
 

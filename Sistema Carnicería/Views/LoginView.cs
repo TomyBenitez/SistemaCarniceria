@@ -1,6 +1,7 @@
 ﻿using FrmCosmopolita.Utils;
 using Sistema_Carnicería.Data;
 using Sistema_Carnicería.Enums;
+using Sistema_Carnicería.Repositories;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -15,7 +16,7 @@ namespace Sistema_Carnicería.Views
 {
     public partial class LoginView : Form
     {
-        CarniceríaContext db = new CarniceríaContext();
+        private CobradoresRepository cobradoresRepository = new CobradoresRepository();
         int intentosfallidos = 0;
         public LoginView()
         {
@@ -27,13 +28,12 @@ namespace Sistema_Carnicería.Views
             this.Close();
         }
 
-        private void btnLogin_Click(object sender, EventArgs e)
+        private async void btnLogin_Click(object sender, EventArgs e)
         {
             var user = txtUser.Text;
             var pass = Helper.ObtenerHashSha256(txtPassword.Text);
-            var usuarioLogueado = db.Cobradores.Where(u => u.Username == user &&
-                                                    u.Password == pass)
-                                                    .FirstOrDefault();
+            var todosLosCobradores = await cobradoresRepository.GetAllAsync();
+            var usuarioLogueado = todosLosCobradores.Where(u => u.Username == user && u.Password == pass).FirstOrDefault();
             if (usuarioLogueado == null)
             {
                 intentosfallidos++;

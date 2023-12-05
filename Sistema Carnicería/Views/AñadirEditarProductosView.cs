@@ -2,6 +2,7 @@
 using Sistema_Carnicería.Data;
 using Sistema_Carnicería.Enums;
 using Sistema_Carnicería.Models;
+using Sistema_Carnicería.Repositories;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -16,9 +17,8 @@ namespace Sistema_Carnicería.Presentation
 {
     public partial class AñadirEditarProductosView : Form
     {
-        CarniceríaContext db = new CarniceríaContext();
-        Producto producto;
-        public int idProductoSeleccionado = 0;
+        private ProductosRepository productosRepository = new ProductosRepository();
+        Producto ProductoEditado { get; set; }
         public AñadirEditarProductosView()
         {
             InitializeComponent();
@@ -28,7 +28,9 @@ namespace Sistema_Carnicería.Presentation
 
         private async void ActualizarGrilla()
         {
-            grdProductos.DataSource = await db.Productos.ToListAsync();
+            grdProductos.DataSource = null;
+            var todosLosProductos = await productosRepository.GetAllAsync();
+            grdProductos.DataSource = todosLosProductos.ToList();
         }
 
         private void btnBuscar_Click(object sender, EventArgs e)
@@ -46,7 +48,11 @@ namespace Sistema_Carnicería.Presentation
 
         private async void ActualizarGrilla(string cadenaDeBusqueda)
         {
-            grdProductos.DataSource = await db.Productos.Where(p => p.Nombre.Contains(cadenaDeBusqueda)).ToListAsync();
+            var todosLosProductos = await productosRepository.GetAllAsync();
+            var productosFiltrados = todosLosProductos
+                .Where(c => c.Nombre.Contains(cadenaDeBusqueda))
+                .ToList();
+            grdProductos.DataSource = productosFiltrados;
         }
 
         private void btnSalir_Click(object sender, EventArgs e)
@@ -91,26 +97,29 @@ namespace Sistema_Carnicería.Presentation
         {
             tabPestañaGeneral.SelectedIndex = 1;
             HabilitarBotones(true);
-            producto = new Producto();
+            ProductoEditado = new Producto();
             CargarDatosProducto();
         }
 
         private void CargarDatosProducto()
         {
-            txtNombreProducto.Text = producto.Nombre;
-            NUDMonto.Value = producto.Monto;
-            txtCodigo.Text = producto.Id.ToString();
+            txtNombreProducto.Text = ProductoEditado.Nombre;
+            NUDMonto.Value = ProductoEditado.Monto;
+            txtCodigo.Text = ProductoEditado.Id.ToString();
         }
 
-        private void btnModificar_Click(object sender, EventArgs e)
+        private async Task RecuperarDatosProductoSeleccionado()
+        {
+            int idNotaSeleccionada = (int)grdProductos.CurrentRow.Cells[0].Value;
+            ProductoEditado = await productosRepository.GetById(idNotaSeleccionada);
+        }
+
+        private async void btnModificar_Click(object sender, EventArgs e)
         {
             tabPestañaGeneral.SelectedIndex = 1;
             HabilitarBotones(true);
-            if (idProductoSeleccionado != 0)
-            {
-                producto = db.Productos.Find(idProductoSeleccionado);
-                CargarDatosProducto();
-            }
+            await RecuperarDatosProductoSeleccionado();
+            CargarDatosProducto();
         }
 
         private void btnCancelar_Click(object sender, EventArgs e)
@@ -119,34 +128,32 @@ namespace Sistema_Carnicería.Presentation
             HabilitarBotones(false);
         }
 
-        private void btnGuardar_Click(object sender, EventArgs e)
+        private async void btnGuardar_Click(object sender, EventArgs e)
         {
-            producto.Nombre = txtNombreProducto.Text;
-            producto.Monto = NUDMonto.Value;
-            if (producto.Id == 0)
+            ProductoEditado.Nombre = txtNombreProducto.Text;
+            ProductoEditado.Monto = NUDMonto.Value;
+            if (ProductoEditado.Id == 0)
             {
-                db.Productos.Add(producto);
+                await productosRepository.AddAsync(ProductoEditado);
             }
             else
             {
-                db.Entry(producto).State = EntityState.Modified;
+                await productosRepository.UpdateAsync(ProductoEditado);
             }
-            db.SaveChanges();
+            ProductoEditado = null;
             tabPestañaGeneral.SelectedIndex = 0;
             ActualizarGrilla();
             HabilitarBotones(false);
         }
 
-        private void btnEliminar_Click(object sender, EventArgs e)
+        private async void btnEliminar_Click(object sender, EventArgs e)
         {
             var idProducto = (int)grdProductos.CurrentRow.Cells[0].Value;
             var nombreProducto = (string)grdProductos.CurrentRow.Cells[1].Value;
             DialogResult respuesta = MessageBox.Show($"¿Deseas eliminar el prodcuto {nombreProducto}?", "Eliminar", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (respuesta == DialogResult.Yes)
             {
-                var ProductoBorrar = db.Productos.Find(idProducto);
-                db.Productos.Remove(ProductoBorrar);
-                db.SaveChanges();
+                await productosRepository.RemoveAsync(idProducto);
                 ActualizarGrilla();
             }
         }
@@ -158,8 +165,14 @@ namespace Sistema_Carnicería.Presentation
 
         private void grdClientes_CellEnter(object sender, DataGridViewCellEventArgs e)
         {
-            idProductoSeleccionado = (int)grdProductos.CurrentRow.Cells[0].Value;
-            producto = db.Productos.Find(idProductoSeleccionado);
+            if (grdProductos.CurrentRow != null)
+            {
+                var productoSeleccionado = grdProductos.CurrentRow.DataBoundItem as Producto;
+                if (productoSeleccionado != null)
+                {
+                    ProductoEditado = productoSeleccionado;
+                }
+            }
             CargarDatosProducto();
         }
 

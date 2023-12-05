@@ -1,7 +1,9 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using FrmCosmopolita.Utils;
+using Microsoft.EntityFrameworkCore;
 using Sistema_Carnicería.Data;
 using Sistema_Carnicería.Enums;
 using Sistema_Carnicería.Models;
+using Sistema_Carnicería.Repositories;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -16,9 +18,8 @@ namespace Sistema_Carnicería.Presentation
 {
     public partial class AñadirEditarClientesView : Form
     {
-        CarniceríaContext db = new CarniceríaContext();
-        Cliente clientes;
-        public int idClienteSeleccionado = 0;
+        private ClientesRepository clientesRepository = new ClientesRepository();
+        Cliente ClienteEditado { get; set; }
         public AñadirEditarClientesView()
         {
             InitializeComponent();
@@ -28,7 +29,9 @@ namespace Sistema_Carnicería.Presentation
 
         private async void ActualizarGrilla()
         {
-            grdClientes.DataSource = await db.Clientes.ToListAsync();
+            grdClientes.DataSource = null;
+            var todosLosClientes = await clientesRepository.GetAllAsync();
+            grdClientes.DataSource = todosLosClientes.ToList();
         }
 
         private void txtBusqueda_KeyDown(object sender, KeyEventArgs e)
@@ -46,7 +49,12 @@ namespace Sistema_Carnicería.Presentation
 
         private async void ActualizarGrilla(string cadenaDeBusqueda)
         {
-            grdClientes.DataSource = await db.Clientes.Where(c => c.Apellido_Nombre.Contains(cadenaDeBusqueda)).ToListAsync();
+            var todosLosClientes = await clientesRepository.GetAllAsync();
+            var clientesFiltrados = todosLosClientes
+                .Where(c => c.Apellido_Nombre.Contains(cadenaDeBusqueda))
+                .ToList();
+            grdClientes.DataSource = clientesFiltrados;
+
         }
 
         private void btnSalir_Click(object sender, EventArgs e)
@@ -91,27 +99,30 @@ namespace Sistema_Carnicería.Presentation
         {
             tabPestañaGeneral.SelectedIndex = 1;
             HabilitarBotones(true);
-            clientes = new Cliente();
+            ClienteEditado = new Cliente();
             CargarDatosActividad();
         }
 
         private void CargarDatosActividad()
         {
-            txtApellido_Nombre.Text = clientes.Apellido_Nombre;
-            txtDireccion.Text = clientes.Dirección;
-            txtTelefono.Text = clientes.Teléfono;
-            txtCodigo.Text = clientes.Id.ToString();
+            txtApellido_Nombre.Text = ClienteEditado.Apellido_Nombre;
+            txtDireccion.Text = ClienteEditado.Dirección;
+            txtTelefono.Text = ClienteEditado.Teléfono;
+            txtCodigo.Text = ClienteEditado.Id.ToString();
         }
 
-        private void btnModificar_Click(object sender, EventArgs e)
+        private async Task RecuperarDatosClienteSeleccionado()
+        {
+            int idNotaSeleccionada = (int)grdClientes.CurrentRow.Cells[0].Value;
+            ClienteEditado = await clientesRepository.GetById(idNotaSeleccionada);
+        }
+
+        private async void btnModificar_Click(object sender, EventArgs e)
         {
             tabPestañaGeneral.SelectedIndex = 1;
             HabilitarBotones(true);
-            if (idClienteSeleccionado != 0)
-            {
-                clientes = db.Clientes.Find(idClienteSeleccionado);
-                CargarDatosActividad();
-            }
+            await RecuperarDatosClienteSeleccionado();
+            CargarDatosActividad();
         }
 
         private void btnCancelar_Click(object sender, EventArgs e)
@@ -122,33 +133,31 @@ namespace Sistema_Carnicería.Presentation
 
         private async void btnGuardar_Click(object sender, EventArgs e)
         {
-            clientes.Apellido_Nombre = txtApellido_Nombre.Text;
-            clientes.Dirección = txtDireccion.Text;
-            clientes.Teléfono = txtTelefono.Text;
-            if (clientes.Id == 0)
+            ClienteEditado.Apellido_Nombre = txtApellido_Nombre.Text;
+            ClienteEditado.Dirección = txtDireccion.Text;
+            ClienteEditado.Teléfono = txtTelefono.Text;
+            if (ClienteEditado.Id == 0)
             {
-                db.Clientes.Add(clientes);
+                await clientesRepository.AddAsync(ClienteEditado);
             }
             else
             {
-                db.Entry(clientes).State = EntityState.Modified;
+                await clientesRepository.UpdateAsync(ClienteEditado);
             }
-            db.SaveChanges();
+            ClienteEditado = null;
             tabPestañaGeneral.SelectedIndex = 0;
             ActualizarGrilla();
             HabilitarBotones(false);
         }
 
-        private void btnEliminar_Click(object sender, EventArgs e)
+        private async void btnEliminar_Click(object sender, EventArgs e)
         {
             var idCliente = (int)grdClientes.CurrentRow.Cells[0].Value;
             var nombreCliente = (string)grdClientes.CurrentRow.Cells[1].Value;
             DialogResult respuesta = MessageBox.Show($"¿Deseas eliminar a {nombreCliente}?", "Eliminar", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (respuesta == DialogResult.Yes)
             {
-                var ClienteBorrar = db.Clientes.Find(idCliente);
-                db.Clientes.Remove(ClienteBorrar);
-                db.SaveChanges();
+                await clientesRepository.RemoveAsync(idCliente);
                 ActualizarGrilla();
             }
         }
@@ -160,8 +169,14 @@ namespace Sistema_Carnicería.Presentation
 
         private void grdClientes_CellEnter(object sender, DataGridViewCellEventArgs e)
         {
-            idClienteSeleccionado = (int)grdClientes.CurrentRow.Cells[0].Value;
-            clientes = db.Clientes.Find(idClienteSeleccionado);
+            if (grdClientes.CurrentRow != null)
+            {
+                var clienteSeleccionado = grdClientes.CurrentRow.DataBoundItem as Cliente;
+                if (clienteSeleccionado != null)
+                {
+                    ClienteEditado = clienteSeleccionado;
+                }
+            }
             CargarDatosActividad();
         }
 

@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Sistema_Carnicería.Data;
 using Sistema_Carnicería.Enums;
 using Sistema_Carnicería.Models;
+using Sistema_Carnicería.Repositories;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
@@ -19,10 +20,12 @@ namespace Sistema_Carnicería.Presentation
 {
     public partial class AñadirEditarVentasView : Form
     {
-        CarniceríaContext db = new CarniceríaContext();
-        Venta venta;
-        public int idVentaSeleccionada = 0;
+        private VentasRepository ventasRepository = new VentasRepository();
+        private ClientesRepository clientesRepository = new ClientesRepository();
+        private ProductosRepository productosRepository = new ProductosRepository();
+        Venta VentaEditada { get; set; }
         public List<Producto> productosArray = new List<Producto>();
+        public List<Venta> ventasArray = new List<Venta>();
         public AñadirEditarVentasView()
         {
             InitializeComponent();
@@ -35,38 +38,86 @@ namespace Sistema_Carnicería.Presentation
             CargarCboClientes();
             CargarCboProductos();
         }
-        private void CargarCboClientes()
+        private async Task CargarCboClientes()
         {
-            cboCliente.DataSource = db.Clientes.ToList();
+            var data = await clientesRepository.GetAllAsync();
+            cboCliente.DataSource = data;
             cboCliente.DisplayMember = "Apellido_Nombre";
             cboCliente.ValueMember = "Id";
         }
-        private void CargarCboProductos()
+        private async Task CargarCboProductos()
         {
-            productosArray = db.Productos.ToList();
-            cboProductos.DataSource = productosArray;
+            var data = await productosRepository.GetAllAsync();
+            productosArray.Clear();
+            productosArray = data.ToList();
+            cboProductos.DataSource = data;
             cboProductos.DisplayMember = "Nombre";
             cboProductos.ValueMember = "Id";
         }
 
         private async void ActualizarGrilla()
         {
-            grdVentas.DataSource = await db.Ventas.Include(v => v.Cobrador).DefaultIfEmpty().Include(v => v.Cliente).DefaultIfEmpty().Include(v => v.Producto).DefaultIfEmpty().ToListAsync();
-            grdVentas.Columns.RemoveAt(1);
-            grdVentas.Columns.RemoveAt(2);
-            grdVentas.Columns.RemoveAt(3);
-            grdVentas.Columns.RemoveAt(3);
-            grdVentas.Columns.RemoveAt(4);
+            grdVentas.DataSource = null;
+            ventasArray.Clear();
+            var ventas = await ventasRepository.GetAllAsync();
+            var productos = await productosRepository.GetAllAsync();
+            var clientes = await clientesRepository.GetAllAsync();
+            foreach (var venta in ventas)
+            {
+                var producto = productos.FirstOrDefault(p => p.Id == venta.ProductoId);
+                if (producto != null)
+                {
+                    var nombreProducto = producto.Nombre;
+                    venta.NombreProducto = nombreProducto;
+                }
+                var cliente = clientes.FirstOrDefault(c => c.Id == venta.ClienteId);
+                if (cliente != null)
+                {
+                    var nombreCliente = cliente.Apellido_Nombre;
+                    venta.NombreCliente = nombreCliente;
+                }
+                ventasArray.Add(venta);
+            }
+            grdVentas.DataSource = ventasArray;
+            grdVentas.Columns[1].Visible = false;
+            grdVentas.Columns[2].Visible = false;
+            grdVentas.Columns[3].Visible = false;
+            grdVentas.Columns[4].Visible = false;
+            grdVentas.Columns[6].Visible = false;
+            grdVentas.Columns[7].Visible = false;
         }
 
         private async void ActualizarGrilla(string cadenaDeBusqueda)
         {
-            grdVentas.DataSource = await db.Ventas.Where(v => v.Fecha.ToString().Contains(cadenaDeBusqueda)).Include(v => v.Cobrador).DefaultIfEmpty().Include(v => v.Cliente).DefaultIfEmpty().Include(v => v.Producto).DefaultIfEmpty().ToListAsync();
-            grdVentas.Columns.RemoveAt(1);
-            grdVentas.Columns.RemoveAt(2);
-            grdVentas.Columns.RemoveAt(3);
-            grdVentas.Columns.RemoveAt(3);
-            grdVentas.Columns.RemoveAt(4);
+            grdVentas.DataSource = null;
+            ventasArray.Clear();
+            var todasLasVentas = await ventasRepository.GetAllAsync();
+            var productos = await productosRepository.GetAllAsync();
+            var clientes = await clientesRepository.GetAllAsync();
+            var ventasFiltradas = todasLasVentas.Where(v => v.Fecha.Date == DateTime.Parse(cadenaDeBusqueda)).ToList();
+            foreach (var venta in ventasFiltradas)
+            {
+                var producto = productos.FirstOrDefault(p => p.Id == venta.ProductoId);
+                if (producto != null)
+                {
+                    var nombreProducto = producto.Nombre;
+                    venta.NombreProducto = nombreProducto;
+                }
+                var cliente = clientes.FirstOrDefault(c => c.Id == venta.ClienteId);
+                if (cliente != null)
+                {
+                    var nombreCliente = cliente.Apellido_Nombre;
+                    venta.NombreCliente = nombreCliente;
+                }
+                ventasArray.Add(venta);
+            }
+            grdVentas.DataSource = ventasArray;
+            grdVentas.Columns[1].Visible = false;
+            grdVentas.Columns[2].Visible = false;
+            grdVentas.Columns[3].Visible = false;
+            grdVentas.Columns[4].Visible = false;
+            grdVentas.Columns[6].Visible = false;
+            grdVentas.Columns[7].Visible = false;
         }
         private void HabilitarBotones(bool valor)
         {
@@ -103,10 +154,10 @@ namespace Sistema_Carnicería.Presentation
         }
         private void CargarDatosVentas()
         {
-            cboCliente.SelectedValue = venta.ClienteId;
-            cboProductos.SelectedValue = venta.ProductoId;
-            NUDcantidad.Value = venta.Cantidad;
-            txtCodigo.Text = venta.Id.ToString();
+            cboCliente.SelectedValue = VentaEditada.ClienteId;
+            cboProductos.SelectedValue = VentaEditada.ProductoId;
+            NUDcantidad.Value = VentaEditada.Cantidad;
+            txtCodigo.Text = VentaEditada.Id.ToString();
         }
 
         private void btnSalir_Click(object sender, EventArgs e)
@@ -118,19 +169,21 @@ namespace Sistema_Carnicería.Presentation
         {
             tabPestañaGeneral.SelectedIndex = 1;
             HabilitarBotones(true);
-            venta = new Venta();
+            VentaEditada = new Venta();
             CargarDatosVentas();
         }
+        private async Task RecuperarDatosVentaSeleccionada()
+        {
+            int idVentaSeleccionada = (int)grdVentas.CurrentRow.Cells[0].Value;
+            VentaEditada = await ventasRepository.GetById(idVentaSeleccionada);
+        }
 
-        private void btnModificar_Click(object sender, EventArgs e)
+        private async void btnModificar_Click(object sender, EventArgs e)
         {
             tabPestañaGeneral.SelectedIndex = 1;
             HabilitarBotones(true);
-            if (idVentaSeleccionada != 0)
-            {
-                venta = db.Ventas.Find(idVentaSeleccionada);
-                CargarDatosVentas();
-            }
+            await RecuperarDatosVentaSeleccionada();
+            CargarDatosVentas();
         }
 
         private void btnCancelar_Click(object sender, EventArgs e)
@@ -139,38 +192,36 @@ namespace Sistema_Carnicería.Presentation
             HabilitarBotones(false);
         }
 
-        private void btnGuardar_Click(object sender, EventArgs e)
+        private async void btnGuardar_Click(object sender, EventArgs e)
         {
-            venta.ClienteId = Convert.ToInt32(cboCliente.SelectedValue);
-            venta.CobradorId = HomeCarniceríaView.UsuarioLogueado.Id;
-            venta.ProductoId = Convert.ToInt32(cboProductos.SelectedValue);
-            venta.Cantidad = (int)NUDcantidad.Value;
-            venta.Fecha = DateTime.Now;
-            venta.MontoTotal = productosArray.FirstOrDefault(p => p.Id == venta.ProductoId).Monto;
-            if (venta.Id == 0)
+            VentaEditada.ClienteId = Convert.ToInt32(cboCliente.SelectedValue);
+            VentaEditada.CobradorId = HomeCarniceríaView.UsuarioLogueado.Id;
+            VentaEditada.ProductoId = Convert.ToInt32(cboProductos.SelectedValue);
+            VentaEditada.Cantidad = (int)NUDcantidad.Value;
+            VentaEditada.Fecha = DateTime.Now;
+            VentaEditada.MontoTotal = productosArray.FirstOrDefault(p => p.Id == VentaEditada.ProductoId).Monto;
+            if (VentaEditada.Id == 0)
             {
-                db.Ventas.Add(venta);
+                await ventasRepository.AddAsync(VentaEditada);
             }
             else
             {
-                db.Entry(venta).State = EntityState.Modified;
+                await ventasRepository.UpdateAsync(VentaEditada);
             }
-            db.SaveChanges();
+            VentaEditada = null;
             tabPestañaGeneral.SelectedIndex = 0;
             ActualizarGrilla();
             HabilitarBotones(false);
         }
 
-        private void btnEliminar_Click(object sender, EventArgs e)
+        private async void btnEliminar_Click(object sender, EventArgs e)
         {
             var idVenta = (int)grdVentas.CurrentRow.Cells[0].Value;
             var nombreVenta = grdVentas.CurrentRow.Cells[3].Value;
             DialogResult respuesta = MessageBox.Show($"¿Deseas eliminar la venta= {nombreVenta}?", "Eliminar", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
             if (respuesta == DialogResult.Yes)
             {
-                var borrarVenta = db.Ventas.Find(idVenta);
-                db.Ventas.Remove(borrarVenta);
-                db.SaveChanges();
+                await ventasRepository.RemoveAsync(idVenta);
                 ActualizarGrilla();
             }
         }
@@ -182,12 +233,14 @@ namespace Sistema_Carnicería.Presentation
 
         private void grdCobradores_CellEnter(object sender, DataGridViewCellEventArgs e)
         {
-            var grilla = grdVentas.CurrentRow.Cells[0].Value;
-            if (grilla!=null)
+            if (grdVentas.CurrentRow != null)
             {
-                idVentaSeleccionada = (int)grdVentas.CurrentRow.Cells[0].Value;
-                venta = db.Ventas.Find(idVentaSeleccionada);
-                CargarDatosVentas();
+                var ventaSeleccionada = grdVentas.CurrentRow.DataBoundItem as Venta;
+                if (ventaSeleccionada != null)
+                {
+                    VentaEditada = ventaSeleccionada;
+                    CargarDatosVentas();
+                }
             }
         }
 
